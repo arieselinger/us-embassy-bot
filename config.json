@@ -1,0 +1,19 @@
+{
+  "webdriver": {
+    "headless": true
+  },
+  "msg_lang": "fr_FR",
+  "embassy": {
+    "username": "john.doe@gmail.com",
+    "password": "mySuperPassword",
+    "appointment_number": "00000000"
+  },
+  "email_notification": {
+    "sender": {
+      "username": "visa.bot.usa@gmail.com",
+      "password": "password",
+      "name": "Visa Bot USA"
+    },
+    "recipient": "john.doe@gmail.com"
+  }
+}
