@@ -90,10 +90,10 @@ def login_and_get_cookies(username, password, appointment_number, headless):
     # Get credentials
     sleep(5)
     log('Getting credentials.')
+    cookies = {}  # Should contain '_yatri_session', '_ga' and '_gid'
     for cookie in browser.get_cookies():
-        if cookie.get('name') == '_yatri_session':
-            break
-    cookies = {'_yatri_session': cookie.get('value')}
+        if cookie.get('name'):
+            cookies[cookie.get('name')] = cookie.get('value')
     sleep(5)
 
     return cookies
@@ -107,21 +107,22 @@ def get_new_appointment_date(credentials, appointment_number):
     :return: date
     """
     log('Seeking an earlier appointment.')
-    params = (('appointments/[expedite/]', 'false'),)
-    request_url = f'https://ais.usvisa-info.com/fr-fr/niv/schedule/' \
-                  f'{appointment_number}/appointment/days/44.json'
+    request_url = f'https://ais.usvisa-info.com/fr-fr/niv/schedule/{appointment_number}/appointment/days/44.json'
     headers = {
+        'Host': 'ais.usvisa-info.com',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:94.0) Gecko/20100101 Firefox/94.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
         'Accept-Encoding': 'gzip, deflate, br',
-        'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 '
-                      '(KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36',
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
-        'Referer': f'https://ais.usvisa-info.com/fr-fr/niv/schedule/'
-                   f'{appointment_number}/appointment',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Host': 'ais.usvisa-info.com'
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'cross-site',
+        'Cache-Control': 'max-age=0'
     }
-    response = requests.get(request_url, headers=headers, params=params, cookies=credentials)
+    response = requests.get(request_url, headers=headers, cookies=credentials)
     response = response.json()[0]['date']
     return response
 
