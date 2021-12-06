@@ -16,6 +16,8 @@ brew install geckodriver
 pip3 install -r requirements.txt
 ```
 
+Then make sure to have `Firefox` installed on your computer.
+
 ### Linux (Debian)
 
 On linux you need to download the latest release in a `.tar.gz` format:
