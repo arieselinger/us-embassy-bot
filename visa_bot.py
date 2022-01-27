@@ -8,6 +8,7 @@ import requests
 import dateparser
 import locale
 import smtplib
+import slack_bot
 
 browser = None
 
@@ -87,44 +88,44 @@ def login_and_get_cookies(username, password, appointment_number, headless):
     condition_elt.click()
     login_elt.click()
 
-    # Get credentials
+    # Get cookies
     sleep(5)
-    log('Getting credentials.')
+    log('Getting cookies.')
     cookies = {}  # Should contain '_yatri_session', '_ga' and '_gid'
     for cookie in browser.get_cookies():
         if cookie.get('name'):
             cookies[cookie.get('name')] = cookie.get('value')
     sleep(5)
+    print(cookies)
 
     return cookies
 
 
-def get_new_appointment_date(credentials, appointment_number):
+def get_new_appointment_date(cookies, appointment_number):
     """
     Requests the earliest appointment date
-    :param credentials: cookies for the login_and_get_cookies function
+    :param cookies: cookies for the login_and_get_cookies function
     :param appointment_number: Appointment number
     :return: date
     """
     log('Seeking an earlier appointment.')
     request_url = f'https://ais.usvisa-info.com/fr-fr/niv/schedule/{appointment_number}/appointment/days/44.json'
     headers = {
-        'Host': 'ais.usvisa-info.com',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:94.0) Gecko/20100101 Firefox/94.0',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'DNT': '1',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'cross-site',
-        'Cache-Control': 'max-age=0'
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:96.0) Gecko/20100101 Firefox/96.0",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "fr,fr-FR;q=0.8,en-US;q=0.5,en;q=0.3",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Cache-Control": "max-age=0"
     }
-    response = requests.get(request_url, headers=headers, cookies=credentials)
-    response = response.json()[0]['date']
-    return response
+    response = requests.get(request_url, headers=headers, cookies=cookies)
+    response = response.json()
+    if len(response) > 0:
+        return response[0]['date']
+    return "2050-01-01"
 
 
 def send_email(sender_name, user, pwd, recipient, subject, body):
@@ -147,12 +148,20 @@ def main():
     with open('config.json') as fi:
         config = json.load(fi)
 
-    # Get credentials
+    # Slack bot
+    channel_id = None
+    if config.get('slack_notification'):
+        slack_config = config['slack_notification']
+        slack_bot.connect_client(slack_config['token'])
+        channel_id = slack_bot.find_channel_id(slack_config['channel_name'])
+    print(channel_id)
+
+    # Get embassy cookies
     username = config['embassy']['username']
     password = config['embassy']['password']
     appointment_number = config['embassy']['appointment_number']
     headless = config['webdriver']['headless']
-    credentials = login_and_get_cookies(username, password, appointment_number, headless)
+    cookies = login_and_get_cookies(username, password, appointment_number, headless)
     log('Connected with success.')
 
     # Get a new appointment date
@@ -160,10 +169,9 @@ def main():
 
     while True:
         try:
-            new_date = get_new_appointment_date(credentials, appointment_number)
+            new_date = get_new_appointment_date(cookies, appointment_number)
             locale.setlocale(locale.LC_TIME, config['msg_lang'])
-            if not earliest_availability or dateparser.parse(new_date) != dateparser.parse(
-                    earliest_availability):
+            if not earliest_availability or dateparser.parse(new_date) != dateparser.parse(earliest_availability):
                 if config['msg_lang'] == 'fr_FR':
                     formatted_date = dateparser.parse(new_date).strftime('%A %e %B %G')
                     msg = f"Nouveau rendez-vous disponible le {formatted_date}."
@@ -171,13 +179,18 @@ def main():
                     formatted_date = dateparser.parse(new_date).strftime('%A, %e %B %G')
                     msg = f"New appointment available at the US Embassy {formatted_date}."
                 log("Sending a notification - {}".format(msg))
-                send_email(config['email_notification']['sender']['name'],
-                           config['email_notification']['sender']['username'],
-                           config['email_notification']['sender']['password'],
-                           config['email_notification']['recipient'],
-                           "Nouveau rendez-vous disponible!" if config['msg_lang'] == 'fr_FR' else
-                           "New appointment available!",
-                           msg)
+
+                if channel_id:
+                    slack_bot.send_message(msg, channel_id)
+
+                if config.get('email_notification'):
+                    send_email(config['email_notification']['sender']['name'],
+                               config['email_notification']['sender']['username'],
+                               config['email_notification']['sender']['password'],
+                               config['email_notification']['recipient'],
+                               "Nouveau rendez-vous disponible!" if config['msg_lang'] == 'fr_FR' else
+                               "New appointment available!",
+                               msg)
                 earliest_availability = new_date
             sleep(30)
 
@@ -186,8 +199,7 @@ def main():
             log("Exception: " + str(e))
             while not is_connected:
                 try:
-                    credentials = login_and_get_cookies(username, password, appointment_number,
-                                                        headless)
+                    cookies = login_and_get_cookies(username, password, appointment_number, headless)
                     log('Connected with success.')
                     is_connected = True
                 except Exception as e:

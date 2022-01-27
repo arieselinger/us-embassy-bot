@@ -1,3 +1,4 @@
 selenium
 dateparser
 requests
+slack_sdk

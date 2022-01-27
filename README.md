@@ -30,7 +30,7 @@ pip3 install -r requirements.txt
 
 ## 2. Configuration
 
-The `config.json` file should be filled out like this:
+The `config.json` file should be filled out like this if you would like to receive email notifications
 
 ```{json}
 {
@@ -52,6 +52,15 @@ The `config.json` file should be filled out like this:
     "recipient": "john.doe@gmail.com"
   }
 }
+```
+
+To receive slack notifications instead:
+```
+  "email_notification": null,
+  "slack_notification": {
+    "token": "xoxb-3000964238150-3007723475747-ZKS1SSbgst1JebY2IpF8e98234",
+    "channel_name": "rendez-vous"
+  }
 ```
 
 ## 3. Run script
